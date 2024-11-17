@@ -89,6 +89,8 @@ class StorageManager:
             return deque(maxlen=size)
 
     def load_model(self):
+        print(f"Current stage: {self.stage}")
+        self.stage = 13
         model_path = os.path.join(self.session_dir, 'stage'+str(self.stage)+'_agent.pkl')
         try :
             with open(model_path, 'rb') as f:

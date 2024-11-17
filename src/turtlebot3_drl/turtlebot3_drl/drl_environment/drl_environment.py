@@ -84,6 +84,9 @@ class DRLEnvironment(Node):
         self.local_step = 0
         self.time_sec = 0
 
+        self.target_x = [0.0] * MAX_NUMBER_OBSTACLES
+        self.target_y = [0.0] * MAX_NUMBER_OBSTACLES
+
         """************************************************************
         ** Initialise ROS publishers and subscribers
         ************************************************************"""
@@ -124,6 +127,8 @@ class DRLEnvironment(Node):
             obstacle_id = int(msg.child_frame_id[-1]) - 1
             diff_x = self.robot_x - robot_pos.x
             diff_y = self.robot_y - robot_pos.y
+            self.target_x[obstacle_id] = robot_pos.x
+            self.target_y[obstacle_id] = robot_pos.y
             self.obstacle_distances[obstacle_id] = math.sqrt(diff_y**2 + diff_x**2)
         else:
             print("ERROR: received odom was not from obstacle!")
@@ -265,8 +270,9 @@ class DRLEnvironment(Node):
 
         # Prepare repsonse
         response.state = self.get_state(request.previous_action[LINEAR], request.previous_action[ANGULAR])
-        response.reward = rw.get_reward(self.succeed, action_linear, action_angular, self.goal_distance,
-                                            self.goal_angle, self.obstacle_distance)
+        #response.reward = rw.get_reward(self.succeed, action_linear, action_angular, self.goal_distance,
+        response.reward = rw.get_reward(self.succeed, action_linear, action_angular, self.goal_distance, self.goal_angle, self.obstacle_distance)
+        #response.reward = rw.get_reward(self.succeed, action_linear, action_angular, self.goal_distance, self.goal_angle, self.obstacle_distance, self.robot_x, self.robot_y, self.target_x, self.target_y)
         response.done = self.done
         response.success = self.succeed
         response.distance_traveled = 0.0

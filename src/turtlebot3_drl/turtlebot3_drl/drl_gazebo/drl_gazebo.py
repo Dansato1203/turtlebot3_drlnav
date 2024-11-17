@@ -35,7 +35,7 @@ import xml.etree.ElementTree as ET
 from ..drl_environment.drl_environment import ARENA_LENGTH, ARENA_WIDTH, ENABLE_DYNAMIC_GOALS
 from ..common.settings import ENABLE_TRUE_RANDOM_GOALS
 
-NO_GOAL_SPAWN_MARGIN = 0.3 # meters away from any wall
+NO_GOAL_SPAWN_MARGIN = 0.1 # meters away from any wall
 class DRLGazebo(Node):
     def __init__(self):
         super().__init__('drl_gazebo')
@@ -105,6 +105,7 @@ class DRLGazebo(Node):
             self.generate_dynamic_goal_pose(request.robot_pose_x, request.robot_pose_y, request.radius)
             print(f"success: generate a new goal, goal pose: {self.goal_x:.2f}, {self.goal_y:.2f}, radius: {request.radius:.2f}")
         else:
+            self.reset_simulation()
             self.generate_goal_pose()
             print(f"success: generate a new goal, goal pose: {self.goal_x:.2f}, {self.goal_y:.2f}")
         return response
@@ -183,11 +184,17 @@ class DRLGazebo(Node):
                 index = random.randrange(0, len(goal_pose_list))
                 self.goal_x = float(goal_pose_list[index][0])
                 self.goal_y = float(goal_pose_list[index][1])
-            elif self.stage == 8 or self.stage == 9 or self.stage == 12:
+            elif self.stage == 8 or self.stage == 9:
                 # --- Define static goal positions here ---
                 goal_pose_list = [[2.0, 2.0], [2.0, 1.5], [2.0, -0.5], [2.0, -1.0], [2.0, -2.0], [1.3, 1.0],
                                     [1.0, 0.3], [1.0, -2.0], [0.3, -1.0],  [0.0, 2.0], [0.0, -1.0], [-1.0, 1.0],
                                         [-1.0, -1.2], [-2.0, 1.0], [-2.2, 0.0], [-2.0, -2.2], [-2.4, 2.4]]
+                index = random.randrange(0, len(goal_pose_list))
+                self.goal_x = float(goal_pose_list[index][0])
+                self.goal_y = float(goal_pose_list[index][1])
+            elif self.stage == 12 or self.stage == 13:
+                # --- Define static goal positions here ---
+                goal_pose_list = [[4.5, 0.0], [4.5, 0.2], [4.5, -0.2], [4.5, 0.3], [4.5, 0.1], [4.5, -0.3]]
                 index = random.randrange(0, len(goal_pose_list))
                 self.goal_x = float(goal_pose_list[index][0])
                 self.goal_y = float(goal_pose_list[index][1])

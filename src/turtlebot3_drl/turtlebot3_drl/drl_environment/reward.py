@@ -1,4 +1,4 @@
-from ..common.settings import REWARD_FUNCTION, COLLISION_OBSTACLE, COLLISION_WALL, TUMBLE, SUCCESS, TIMEOUT, RESULTS_NUM
+from ..common.settings import REWARD_FUNCTION, COLLISION_OBSTACLE, COLLISION_WALL, TUMBLE, SUCCESS, TIMEOUT, RESULTS_NUM, ARENA_WIDTH
 
 goal_dist_initial = 0
 
@@ -6,6 +6,8 @@ reward_function_internal = None
 
 def get_reward(succeed, action_linear, action_angular, distance_to_goal, goal_angle, min_obstacle_distance):
     return reward_function_internal(succeed, action_linear, action_angular, distance_to_goal, goal_angle, min_obstacle_distance)
+#def get_reward(succeed, action_linear, action_angular, goal_dist, goal_angle, min_obstacle_dist, robot_x, robot_y, target_x, target_y):
+#    return reward_function_internal(succeed, action_linear, action_angular, goal_dist, goal_angle, min_obstacle_dist, robot_x, robot_y, target_x, target_y)
 
 def get_reward_A(succeed, action_linear, action_angular, goal_dist, goal_angle, min_obstacle_dist):
         # [-3.14, 0]
@@ -33,6 +35,63 @@ def get_reward_A(succeed, action_linear, action_angular, goal_dist, goal_angle, 
         elif succeed == COLLISION_OBSTACLE or succeed == COLLISION_WALL:
             reward -= 2000
         return float(reward)
+
+def get_reward_B(succeed, action_linear, action_angular, goal_dist, goal_angle, min_obstacle_dist, robot_x, robot_y, target_x, target_y):
+    gamma = [-1.0, 1.0, 1.6, 1.0, 1.0]  # weight coefficients for each reward term
+    v_min = 0  # minimum velocity
+    v_max = 0.3  # maximum velocity
+    lane_width = -0.75  # Half of the total pathway width for 'lanes'
+    L = 1  # total vehicles on the right lane
+    n_front = 1  # vehicles in front of the ego vehicle
+
+    # Collision penalty
+    if succeed in [COLLISION_OBSTACLE, COLLISION_WALL]:
+        r_collision = gamma[0] * 2000
+    else:
+        r_collision = 0
+
+    if succeed == TIMEOUT:
+        r_time = -3000
+    else:
+        r_time = 0
+
+    # [-3.14, 0]
+    r_yaw = -1 * abs(goal_angle)
+
+    # [-4, 0]
+    r_vangular = -1 * (action_angular**2)
+
+    r_distance = (2 * goal_dist_initial) / (goal_dist_initial + goal_dist) - 1
+
+    # Lane keeping bonus
+    if 0 <= robot_y <= 0.75:  # Assuming left side of the pathway as the 'lane'
+        if len(target_x) > 1 and abs(target_x[0] - robot_x) < 0.5:
+            print("1")
+            r_lane = gamma[1] * 20
+        else:
+            r_lane = 0
+    else:
+        r_lane = 0
+
+    # Velocity bonus
+    r_velocity = gamma[2] * ((action_linear - v_min) / (v_max - v_min))
+
+    # Overtaking bonus
+    if -0.75 <= robot_y < 0:  # Right side of the pathway for overtaking
+        r_overtaking = gamma[3] * (1 if any(tx < robot_x for tx in target_x) else -1) * 20
+    else:
+        r_overtaking = 0
+
+    # Terminal bonus
+    if succeed == SUCCESS:
+        r_terminal = 2500
+    else:
+        r_terminal = 0
+
+    # Combine all rewards
+    reward = r_collision + r_lane + r_overtaking + r_terminal + r_yaw + r_vangular + r_time + r_distance + r_velocity
+
+    return float(reward)
 
 # Define your own reward function by defining a new function: 'get_reward_X'
 # Replace X with your reward function name and configure it in settings.py
