@@ -57,7 +57,7 @@ class DRLGazebo(Node):
             'turtlebot3_drl_world',
             'goal_box'
         )
-		self.entity_path = os.path.join(self.entity_dir_path, 'model.sdf')
+        self.entity_path = os.path.join(self.entity_dir_path, 'model.sdf')
         self.entity = open(self.entity_path, 'r').read()
         self.entity_name = 'goal'
 
