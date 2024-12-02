@@ -21,9 +21,9 @@ REWARD_FUNCTION = "A"           # Defined in reward.py
 #REWARD_FUNCTION = "B"           # Defined in reward.py
 EPISODE_TIMEOUT_SECONDS = 120    # Number of seconds after which episode timeout occurs
 
-TOPIC_SCAN = 'scan'
-TOPIC_VELO = 'cmd_vel'
-TOPIC_ODOM = 'odom'
+TOPIC_SCAN = '/main_robot/scan'
+TOPIC_VELO = 'main_robot/cmd_vel'
+TOPIC_ODOM = 'main_robot/odom'
 
 EPISODE_TIMEOUT_SECONDS     = 120    # Number of seconds after which episode timeout occurs
 ARENA_LENGTH                = 10.0   # meters
