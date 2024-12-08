@@ -15,13 +15,13 @@ RUN echo 'Etc/UTC' > /etc/timezone && \
 
 RUN apt-get update && apt-get install -y software-properties-common
 RUN add-apt-repository ppa:deadsnakes/ppa
-RUN apt-get update && apt-get install -y python3.8
+RUN apt-get update && apt-get install -y python3.10
 
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 
 # Install pytorch
 
-RUN apt-get install -y python3-pip
+RUN apt-get install -y python3-pip python3-distutils
 
 RUN pip3 install \
     numpy==1.24.3 \
@@ -29,7 +29,7 @@ RUN pip3 install \
     pandas==2.0.2 \
     pyqtgraph==0.12.4 \
     PyQt5==5.14.1 \
-    torch==1.10.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+    torch==1.11.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
 
 # --- GAZEBO INSTALLATION ---
 
