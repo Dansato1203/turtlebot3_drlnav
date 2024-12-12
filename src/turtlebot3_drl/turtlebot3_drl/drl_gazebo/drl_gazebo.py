@@ -61,6 +61,17 @@ class DRLGazebo(Node):
         self.entity = open(self.entity_path, 'r').read()
         self.entity_name = 'goal'
 
+        self.tb_names = ['tb1', 'tb2', 'tb3', 'tb4', 'tb5', 'tb6', 'tb7']
+        # turtlebot3_multi_robotからモデル読み込み
+        turtlebot3_multi_robot_share = get_package_share_directory('turtlebot3_multi_robot')
+        self.tb_model_path = os.path.join(turtlebot3_multi_robot_share, 'models', 'turtlebot3_burger', 'model.sdf')
+        self.tb_model = open(self.tb_model_path, 'r').read()
+
+        # Nav2アクションクライアント初期化
+        self.navigate_action_clients = {}
+        for tb_name in self.tb_names:
+            self.navigate_action_clients[tb_name] = ActionClient(self, NavigateToPose, f'/{tb_name}/navigate_to_pose')
+
         with open('/tmp/drlnav_current_stage.txt', 'r') as f:
             self.stage = int(f.read())
         print(f"running on stage: {self.stage}, dynamic goals enabled: {ENABLE_DYNAMIC_GOALS}")
@@ -93,6 +104,7 @@ class DRLGazebo(Node):
 
     def init_callback(self):
         self.delete_entity()
+        self.delete_robot()
         self.reset_simulation()
         self.publish_callback()
         print("Init, goal pose:", self.goal_x, self.goal_y)
@@ -105,6 +117,7 @@ class DRLGazebo(Node):
         goal_pose.position.y = self.goal_y
         self.goal_pose_pub.publish(goal_pose)
         self.spawn_entity()
+        self.spawn_robot()
 
     def task_succeed_callback(self, request, response):
         self.delete_entity()
@@ -244,6 +257,14 @@ class DRLGazebo(Node):
             self.get_logger().info('service not available, waiting again...')
         self.delete_entity_client.call_async(req)
 
+    def delete_robot(self):
+        req = DeleteEntity.Request()
+        for name in self.tb_names:
+            req.name = name
+            while not self.delete_entity_client.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info('service not available, waiting again...')
+            self.delete_entity_client.call_async(req)
+
     def spawn_entity(self):
         goal_pose = Pose()
         goal_pose.position.x = self.goal_x
@@ -255,6 +276,22 @@ class DRLGazebo(Node):
         while not self.spawn_entity_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
         self.spawn_entity_client.call_async(req)
+
+    def spawn_robot(self):
+        for name in self.tb_names:
+            pose = Pose()
+            x = random.uniform(-2.0, 2.0)
+            y = random.uniform(-2.0, 2.0)
+            pose.position.x = x
+            pose.position.y = y
+            pose.orientation.w = 1.0
+            req = SpawnEntity.Request()
+            req.name = name
+            req.xml = self.tb_model
+            req.initial_pose = pose
+            while not self.spawn_entity_client.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info('service not available, waiting again...')
+            self.spawn_entity_client.call_async(req)
 
     def get_obstacle_coordinates(self):
         tree = ET.parse(os.getenv('DRLNAV_BASE_PATH') + '/src/turtlebot3_simulations/turtlebot3_gazebo/models/turtlebot3_drl_world/inner_walls/model.sdf')
