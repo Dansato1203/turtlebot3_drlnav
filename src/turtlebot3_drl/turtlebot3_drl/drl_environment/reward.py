@@ -4,10 +4,12 @@ goal_dist_initial = 0
 
 reward_function_internal = None
 
-def get_reward(succeed, action_linear, action_angular, distance_to_goal, goal_angle, min_obstacle_distance):
-    return reward_function_internal(succeed, action_linear, action_angular, distance_to_goal, goal_angle, min_obstacle_distance)
+#def get_reward(succeed, action_linear, action_angular, distance_to_goal, goal_angle, min_obstacle_distance):
+#    return reward_function_internal(succeed, action_linear, action_angular, distance_to_goal, goal_angle, min_obstacle_distance)
 #def get_reward(succeed, action_linear, action_angular, goal_dist, goal_angle, min_obstacle_dist, robot_x, robot_y, target_x, target_y):
 #    return reward_function_internal(succeed, action_linear, action_angular, goal_dist, goal_angle, min_obstacle_dist, robot_x, robot_y, target_x, target_y)
+def get_reward(succeed, action_linear, action_angular, distance_to_goal, goal_angle, min_obstacle_distance, overtake_happened, closest_agent_distance, time_elapsed):
+    return reward_function_internal(succeed, action_linear, action_angular, distance_to_goal, goal_angle, min_obstacle_distance, overtake_happened, closest_agent_distance, time_elapsed)
 
 def get_reward_A(succeed, action_linear, action_angular, goal_dist, goal_angle, min_obstacle_dist):
         # [-3.14, 0]
@@ -91,6 +93,62 @@ def get_reward_B(succeed, action_linear, action_angular, goal_dist, goal_angle, 
     # Combine all rewards
     reward = r_collision + r_lane + r_overtaking + r_terminal + r_yaw + r_vangular + r_time + r_distance + r_velocity
 
+    return float(reward)
+
+def get_reward_C(succeed, action_linear, action_angular, goal_dist, goal_angle, obstacle_dist, overtake_happened=False, closest_agent_distance=999.0, time_elapsed=0.0):
+    SUCCESS_REWARD = 2500
+    COLLISION_PENALTY = 2000
+    BASE_STEP_PENALTY = 1.0
+    OBSTACLE_THRESHOLD = 0.3
+    OBSTACLE_PENALTY = 20.0
+    OVERTAKE_BONUS = 50.0  # 追い越し成功時の報酬
+    AGENT_DISTANCE_THRESHOLD = 0.4
+    TIME_PENALTY_SCALE = 0.1
+
+    # ゴール進捗: -1～1
+    r_distance = (2 * goal_dist_initial) / (goal_dist_initial + goal_dist) - 1
+    # ゴール方向を向くほどよい: -abs(goal_angle)
+    r_yaw = -1.0 * abs(goal_angle)
+    # 大きな角速度はペナルティ
+    r_vangular = -1.0 * (action_angular ** 2)
+
+    # 障害物接近ペナルティ
+    if obstacle_dist < OBSTACLE_THRESHOLD:
+        r_obstacle = -OBSTACLE_PENALTY
+    else:
+        r_obstacle = 0.0
+
+    # 前進速度報酬（0.22m/s想定）
+    MAX_SPEED = 0.5
+    speed_ratio = min(action_linear / MAX_SPEED, 1.0)  
+    r_vlinear = 2.0 * speed_ratio - 1.0  # [-1,1]
+
+    # 追い越し時報酬
+    r_overtake = OVERTAKE_BONUS if overtake_happened else 0.0
+
+    # 他エージェントとの距離評価
+    # 近すぎるとペナルティを付与し、十分離れていれば（あまり大きな報酬にする必要はないが）わずかな報酬も可能
+    if closest_agent_distance < AGENT_DISTANCE_THRESHOLD:
+        r_agent = -50.0 * (AGENT_DISTANCE_THRESHOLD - closest_agent_distance)  # 距離が小さいほど強いペナルティ
+    else:
+        r_agent = 0.0  # 安全距離を保っている限りはペナルティなし、必要なら微小報酬付与可
+
+    # 終了時報酬
+    if succeed == SUCCESS:
+        r_terminal = SUCCESS_REWARD
+    elif succeed == COLLISION_OBSTACLE or succeed == COLLISION_WALL:
+        r_terminal = -COLLISION_PENALTY
+    elif succeed == TIMEOUT:
+        r_terminal = -1000.0
+    elif succeed == TUMBLE:
+        r_terminal = -500.0
+    else:
+        r_terminal = 0.0
+
+    r_base = -BASE_STEP_PENALTY
+    r_time = -TIME_PENALTY_SCALE * time_elapsed
+
+    reward = (r_yaw + r_distance + r_vangular + r_obstacle + r_vlinear + r_overtake + r_agent + r_terminal + r_base + r_time)
     return float(reward)
 
 # Define your own reward function by defining a new function: 'get_reward_X'

@@ -36,7 +36,7 @@ import xml.etree.ElementTree as ET
 from ..drl_environment.drl_environment import ARENA_LENGTH, ARENA_WIDTH, ENABLE_DYNAMIC_GOALS
 from ..common.settings import ENABLE_TRUE_RANDOM_GOALS
 
-NO_GOAL_SPAWN_MARGIN = 0.1 # meters away from any wall
+NO_GOAL_SPAWN_MARGIN = 0.3 # meters away from any wall
 class DRLGazebo(Node):
     def __init__(self):
         super().__init__('drl_gazebo')
@@ -48,6 +48,7 @@ class DRLGazebo(Node):
         #self.entity_dir_path = (os.path.dirname(os.path.realpath(__file__))).replace(
         #    'turtlebot3_drl/lib/python3.8/site-packages/turtlebot3_drl/drl_gazebo',
         #    'turtlebot3_gazebo/share/turtlebot3_gazebo/models/turtlebot3_drl_world/goal_box')
+        
         turtlebot3_gazebo_share_dir = get_package_share_directory('turtlebot3_gazebo')
 
         # Construct the path to the goal_box model
@@ -60,17 +61,6 @@ class DRLGazebo(Node):
         self.entity_path = os.path.join(self.entity_dir_path, 'model.sdf')
         self.entity = open(self.entity_path, 'r').read()
         self.entity_name = 'goal'
-
-        self.tb_names = ['tb1', 'tb2', 'tb3', 'tb4', 'tb5', 'tb6', 'tb7']
-        # turtlebot3_multi_robotからモデル読み込み
-        turtlebot3_multi_robot_share = get_package_share_directory('turtlebot3_multi_robot')
-        self.tb_model_path = os.path.join(turtlebot3_multi_robot_share, 'models', 'turtlebot3_burger', 'model.sdf')
-        self.tb_model = open(self.tb_model_path, 'r').read()
-
-        # Nav2アクションクライアント初期化
-        self.navigate_action_clients = {}
-        for tb_name in self.tb_names:
-            self.navigate_action_clients[tb_name] = ActionClient(self, NavigateToPose, f'/{tb_name}/navigate_to_pose')
 
         with open('/tmp/drlnav_current_stage.txt', 'r') as f:
             self.stage = int(f.read())
@@ -104,7 +94,6 @@ class DRLGazebo(Node):
 
     def init_callback(self):
         self.delete_entity()
-        self.delete_robot()
         self.reset_simulation()
         self.publish_callback()
         print("Init, goal pose:", self.goal_x, self.goal_y)
@@ -117,7 +106,6 @@ class DRLGazebo(Node):
         goal_pose.position.y = self.goal_y
         self.goal_pose_pub.publish(goal_pose)
         self.spawn_entity()
-        self.spawn_robot()
 
     def task_succeed_callback(self, request, response):
         self.delete_entity()
@@ -128,7 +116,6 @@ class DRLGazebo(Node):
             self.generate_dynamic_goal_pose(request.robot_pose_x, request.robot_pose_y, request.radius)
             print(f"success: generate a new goal, goal pose: {self.goal_x:.2f}, {self.goal_y:.2f}, radius: {request.radius:.2f}")
         else:
-            self.reset_simulation()
             self.generate_goal_pose()
             print(f"success: generate a new goal, goal pose: {self.goal_x:.2f}, {self.goal_y:.2f}")
         return response
@@ -201,29 +188,28 @@ class DRLGazebo(Node):
         tries = 0
 
         while ((abs(self.prev_x - self.goal_x) + abs(self.prev_y - self.goal_y)) < 2):
-            if self.stage == 15:
-                # --- Define static goal positions here ---
-                goal_pose_list = [[-0.78, 7.85], [-0.78, 17.5], [-0.78, 28.0], [-10.0, 28.0], [-10.0, 17.5], [-10.0, 7.85]]
+            if self.stage == 17:
+                goal_pose_list = [[9.25, -4.3], [-9.25, 4.25], [-9.25, 0.0], [0.0, 4.25], [-9.25, -4.25], [-8.75, 3.0]]
                 index = random.randrange(0, len(goal_pose_list))
                 self.goal_x = float(goal_pose_list[index][0])
                 self.goal_y = float(goal_pose_list[index][1])
-            if self.stage == 11:
+            elif self.stage == 15:
+                #goal_pose_list = [[-0.78, 7.85], [-0.78, 17.5], [-0.78, 28.0], [-0.78, 0.0], [-10.0, 17.5], [-10.0, 7.85]]
+                goal_pose_list = [[-10.0, 3.0], [-11.0, 15.0], [-12.0, 5.0], [-10.0, 0.0], [-10.0, 17.5], [-10.0, 7.85]]
+                index = random.randrange(0, len(goal_pose_list))
+                self.goal_x = float(goal_pose_list[index][0])
+                self.goal_y = float(goal_pose_list[index][1])
+            elif self.stage == 11:
                 # --- Define static goal positions here ---
                 goal_pose_list = [[0.0, 0.0], [0.0, 6.5], [5.0, 5.5], [-2.5, -6.0], [3.0, -4.0], [6.0, -1.0]]
                 index = random.randrange(0, len(goal_pose_list))
                 self.goal_x = float(goal_pose_list[index][0])
                 self.goal_y = float(goal_pose_list[index][1])
-            elif self.stage == 8 or self.stage == 9:
+            elif self.stage == 8 or self.stage == 9 or self.stage == 12:
                 # --- Define static goal positions here ---
                 goal_pose_list = [[2.0, 2.0], [2.0, 1.5], [2.0, -0.5], [2.0, -1.0], [2.0, -2.0], [1.3, 1.0],
                                     [1.0, 0.3], [1.0, -2.0], [0.3, -1.0],  [0.0, 2.0], [0.0, -1.0], [-1.0, 1.0],
                                         [-1.0, -1.2], [-2.0, 1.0], [-2.2, 0.0], [-2.0, -2.2], [-2.4, 2.4]]
-                index = random.randrange(0, len(goal_pose_list))
-                self.goal_x = float(goal_pose_list[index][0])
-                self.goal_y = float(goal_pose_list[index][1])
-            elif self.stage == 12 or self.stage == 13:
-                # --- Define static goal positions here ---
-                goal_pose_list = [[4.5, 0.0], [4.5, 0.2], [4.5, -0.2], [4.5, 0.3], [4.5, 0.1], [4.5, -0.3]]
                 index = random.randrange(0, len(goal_pose_list))
                 self.goal_x = float(goal_pose_list[index][0])
                 self.goal_y = float(goal_pose_list[index][1])
@@ -257,14 +243,6 @@ class DRLGazebo(Node):
             self.get_logger().info('service not available, waiting again...')
         self.delete_entity_client.call_async(req)
 
-    def delete_robot(self):
-        req = DeleteEntity.Request()
-        for name in self.tb_names:
-            req.name = name
-            while not self.delete_entity_client.wait_for_service(timeout_sec=1.0):
-                self.get_logger().info('service not available, waiting again...')
-            self.delete_entity_client.call_async(req)
-
     def spawn_entity(self):
         goal_pose = Pose()
         goal_pose.position.x = self.goal_x
@@ -276,22 +254,6 @@ class DRLGazebo(Node):
         while not self.spawn_entity_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
         self.spawn_entity_client.call_async(req)
-
-    def spawn_robot(self):
-        for name in self.tb_names:
-            pose = Pose()
-            x = random.uniform(-2.0, 2.0)
-            y = random.uniform(-2.0, 2.0)
-            pose.position.x = x
-            pose.position.y = y
-            pose.orientation.w = 1.0
-            req = SpawnEntity.Request()
-            req.name = name
-            req.xml = self.tb_model
-            req.initial_pose = pose
-            while not self.spawn_entity_client.wait_for_service(timeout_sec=1.0):
-                self.get_logger().info('service not available, waiting again...')
-            self.spawn_entity_client.call_async(req)
 
     def get_obstacle_coordinates(self):
         tree = ET.parse(os.getenv('DRLNAV_BASE_PATH') + '/src/turtlebot3_simulations/turtlebot3_gazebo/models/turtlebot3_drl_world/inner_walls/model.sdf')

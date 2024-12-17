@@ -100,6 +100,22 @@ class DRLEnvironment(Node):
         self.scan_sub = self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, qos_profile=qos_profile_sensor_data)
         self.clock_sub = self.create_subscription(Clock, '/clock', self.clock_callback, qos_profile=qos_clock)
         self.obstacle_odom_sub = self.create_subscription(Odometry, 'obstacle/odom', self.obstacle_odom_callback, qos)
+
+                # 他エージェント用オドメトリ購読 (tb1～tb4)
+        self.other_agents_positions = {
+            "tb1": {"x": 0.0, "y": 0.0, "prev_x": 0.0, "prev_y": 0.0},
+            "tb2": {"x": 0.0, "y": 0.0, "prev_x": 0.0, "prev_y": 0.0},
+            "tb3": {"x": 0.0, "y": 0.0, "prev_x": 0.0, "prev_y": 0.0},
+            "tb4": {"x": 0.0, "y": 0.0, "prev_x": 0.0, "prev_y": 0.0},
+        }
+
+        self.tb1_odom_sub = self.create_subscription(Odometry, 'tb1/odom', self.tb1_odom_callback, qos)
+        self.tb2_odom_sub = self.create_subscription(Odometry, 'tb2/odom', self.tb2_odom_callback, qos)
+        self.tb3_odom_sub = self.create_subscription(Odometry, 'tb3/odom', self.tb3_odom_callback, qos)
+        self.tb4_odom_sub = self.create_subscription(Odometry, 'tb4/odom', self.tb4_odom_callback, qos)
+
+        self.overtake_happened = False
+
         # clients
         self.task_succeed_client = self.create_client(RingGoal, 'task_succeed')
         self.task_fail_client = self.create_client(RingGoal, 'task_fail')
@@ -110,6 +126,21 @@ class DRLEnvironment(Node):
     """*******************************************************************************
     ** Callback functions and relevant functions
     *******************************************************************************"""
+
+    def tb1_odom_callback(self, msg):
+        self.update_agent_position("tb1", msg)
+    def tb2_odom_callback(self, msg):
+        self.update_agent_position("tb2", msg)
+    def tb3_odom_callback(self, msg):
+        self.update_agent_position("tb3", msg)
+    def tb4_odom_callback(self, msg):
+        self.update_agent_position("tb4", msg)
+
+    def update_agent_position(self, agent_name, msg):
+        self.other_agents_positions[agent_name]["prev_x"] = self.other_agents_positions[agent_name]["x"]
+        self.other_agents_positions[agent_name]["prev_y"] = self.other_agents_positions[agent_name]["y"]
+        self.other_agents_positions[agent_name]["x"] = msg.pose.pose.position.x
+        self.other_agents_positions[agent_name]["y"] = msg.pose.pose.position.y
 
     def goal_pose_callback(self, msg):
         self.goal_x = msg.position.x
@@ -238,6 +269,39 @@ class DRLEnvironment(Node):
             self.stop_reset_robot(self.succeed == SUCCESS)
         return state
 
+    def check_overtaking(self):
+        # ロボットのheadingを取得
+        heading = self.robot_heading
+        
+        for agent, pos in self.other_agents_positions.items():
+            # 前ステップでの相対位置
+            dx_prev = pos["prev_x"] - self.robot_x_prev
+            dy_prev = pos["prev_y"] - self.robot_y_prev
+            
+            # 現在ステップでの相対位置
+            dx = pos["x"] - self.robot_x
+            dy = pos["y"] - self.robot_y
+    
+            # ロボット座標系への変換
+            # ロボット座標系では、ロボットの進行方向がx'正方向
+            # x' = dx*cos(heading) + dy*sin(heading)
+            # y' = -dx*sin(heading) + dy*cos(heading) (必要なら使用)
+            
+            x_prime_prev = dx_prev * math.cos(heading) + dy_prev * math.sin(heading)
+            x_prime = dx * math.cos(heading) + dy * math.sin(heading)
+    
+            # 追い越し判定：
+            # 前ステップでエージェントがロボット前方(x'_prev > 0)
+            # 今ステップでエージェントがロボット後方(x' < 0)
+            # になった場合、ロボットがエージェントを追い越したとみなす
+            was_in_front = (x_prime_prev > 0)
+            now_behind = (x_prime < 0)
+    
+            if was_in_front and now_behind:
+                return True
+    
+        return False
+
     def initalize_episode(self, response):
         self.initial_distance_to_goal = self.goal_distance
         response.state = self.get_state(0, 0)
@@ -245,6 +309,10 @@ class DRLEnvironment(Node):
         response.done = False
         response.distance_traveled = 0.0
         rw.reward_initalize(self.initial_distance_to_goal)
+
+        # エピソード開始時に現在のシミュレーション時刻を記録
+        self.start_time = self.time_sec
+
         return response
 
     def step_comm_callback(self, request, response):
@@ -270,8 +338,27 @@ class DRLEnvironment(Node):
 
         # Prepare repsonse
         response.state = self.get_state(request.previous_action[LINEAR], request.previous_action[ANGULAR])
+
+        # 追い越し判定
+        self.overtake_happened = self.check_overtaking()
+
+        # 他エージェントとの最小距離計算
+        closest_agent_distance = 999.0
+        for agent, pos in self.other_agents_positions.items():
+            dx = pos["x"] - self.robot_x
+            dy = pos["y"] - self.robot_y
+            dist = math.sqrt(dx*dx + dy*dy)
+            if dist < closest_agent_distance:
+                closest_agent_distance = dist
+
+        # エピソード開始時刻(start_time)と現在のtime_secから経過時間を算出
+        time_elapsed = self.time_sec - self.start_time
+
+        # 報酬計算: get_reward_Cにovertake_happenedを渡す
+        response.reward = rw.get_reward(self.succeed, action_linear, action_angular, self.goal_distance, self.goal_angle, self.obstacle_distance, self.overtake_happened, closest_agent_distance, time_elapsed)
+
         #response.reward = rw.get_reward(self.succeed, action_linear, action_angular, self.goal_distance,
-        response.reward = rw.get_reward(self.succeed, action_linear, action_angular, self.goal_distance, self.goal_angle, self.obstacle_distance)
+        #response.reward = rw.get_reward(self.succeed, action_linear, action_angular, self.goal_distance, self.goal_angle, self.obstacle_distance)
         #response.reward = rw.get_reward(self.succeed, action_linear, action_angular, self.goal_distance, self.goal_angle, self.obstacle_distance, self.robot_x, self.robot_y, self.target_x, self.target_y)
         response.done = self.done
         response.success = self.succeed

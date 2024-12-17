@@ -17,18 +17,22 @@ GRAPH_AVERAGE_REWARD     = 10       # Average the reward graph over every N epis
 # ===================================================================== #
 
 # --- SIMULATION ENVIRONMENT SETTINGS ---
-REWARD_FUNCTION = "A"           # Defined in reward.py
+#REWARD_FUNCTION = "A"           # Defined in reward.py
 #REWARD_FUNCTION = "B"           # Defined in reward.py
-EPISODE_TIMEOUT_SECONDS = 120    # Number of seconds after which episode timeout occurs
+REWARD_FUNCTION = "C"           # Defined in reward.py
+EPISODE_TIMEOUT_SECONDS = 60    # Number of seconds after which episode timeout occurs
 
-TOPIC_SCAN = '/main_robot/scan'
+TOPIC_SCAN = 'main_robot/scan'
 TOPIC_VELO = 'main_robot/cmd_vel'
 TOPIC_ODOM = 'main_robot/odom'
+#TOPIC_SCAN = 'scan'
+#TOPIC_VELO = 'cmd_vel'
+#TOPIC_ODOM = 'odom'
 
-EPISODE_TIMEOUT_SECONDS     = 120    # Number of seconds after which episode timeout occurs
-ARENA_LENGTH                = 10.0   # meters
+EPISODE_TIMEOUT_SECONDS     = 60    # Number of seconds after which episode timeout occurs
+ARENA_LENGTH                = 20.0   # meters
 ARENA_WIDTH                 = 1.5   # meters
-SPEED_LINEAR_MAX            = 0.3  # m/s
+SPEED_LINEAR_MAX            = 0.5  # m/s
 SPEED_ANGULAR_MAX           = 2.0   # rad/s
 
 LIDAR_DISTANCE_CAP          = 3.5   # meters
@@ -67,8 +71,9 @@ REAL_THRESHOLD_GOAL         = 0.35  # meters, minimum distance to goal that coun
 # ===================================================================== #
 
 # DRL parameters
-REWARD_FUNCTION = "A"       # Defined in reward.py
-#REWARD_FUNCTION = "B"       # Defined in reward.py
+#REWARD_FUNCTION = "A"       # Defined in reward.py
+#REWARD_FUNCTION = "B"           # Defined in reward.py
+REWARD_FUNCTION = "C"       # Defined in reward.py
 ACTION_SIZE     = 2         # Not used for DQN, see DQN_ACTION_SIZE
 HIDDEN_SIZE     = 512       # Number of neurons in hidden layers
 
